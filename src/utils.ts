@@ -138,8 +138,10 @@ export function injectSecret(secretName: string, secretValue: string, parseJsonS
             const keyValue = typeof secretMap[k] === 'string' ? secretMap[k] : JSON.stringify(secretMap[k]);
 
             // Append the current key to the name of the env variable
-            const newEnvName = `${tempEnvName || transformToValidEnvName(secretName)}_${transformToValidEnvName(k)}`;
-            secretsToCleanup = [...secretsToCleanup, ...injectSecret(secretName, keyValue, parseJsonSecrets, newEnvName)];
+            const prefix = tempEnvName || transformToValidEnvName(secretName);
+            const envName = transformToValidEnvName(k);
+            const fullEnvName: string = prefix ? `${prefix}_${envName}` : envName;
+            secretsToCleanup = [...secretsToCleanup, ...injectSecret(secretName, keyValue, parseJsonSecrets, fullEnvName)];
         }
     } else {
         const envName = tempEnvName ? transformToValidEnvName(tempEnvName) : transformToValidEnvName(secretName);
@@ -204,7 +206,7 @@ export function isSecretArn(secretId: string): boolean {
 /*
  * Separates a secret alias from the secret name/arn, if one was provided
  */
-export function extractAliasAndSecretIdFromInput(input: string): [string, string] {
+export function extractAliasAndSecretIdFromInput(input: string): [string | undefined, string] {
     const parsedInput = input.split(',');
     if (parsedInput.length > 1){
         const alias = parsedInput[0].trim();
@@ -221,7 +223,7 @@ export function extractAliasAndSecretIdFromInput(input: string): [string, string
     }
 
     // No alias
-    return [ '', input.trim() ];
+    return [ undefined, input.trim() ];
 }
 
 /*

@@ -29,7 +29,7 @@ export async function run(): Promise<void> {
         // Get and inject secret values
         for (let secretId of secretIds) {
             //  Optionally let user set an alias, i.e. `ENV_NAME,secret_name`
-            let secretAlias = '';
+            let secretAlias: string | undefined = '';
             [secretAlias, secretId] = extractAliasAndSecretIdFromInput(secretId);
 
             // Retrieves the secret name also, if the value is an ARN
@@ -37,7 +37,7 @@ export async function run(): Promise<void> {
 
             try {
                 const secretValueResponse : SecretValueResponse = await getSecretValue(client, secretId);
-                if (!secretAlias){
+                if (secretAlias === undefined){
                     secretAlias = isArn ? secretValueResponse.name : secretId;
                 }
 
