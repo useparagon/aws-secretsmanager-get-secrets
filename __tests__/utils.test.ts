@@ -14,7 +14,9 @@ import {
     injectSecret,
     isSecretArn,
     extractAliasAndSecretIdFromInput,
-    transformToValidEnvName
+    transformToValidEnvName,
+    validateOverwriteMode,
+    OverwriteMode
 } from "../src/utils";
 
 import { CLEANUP_NAME, LIST_SECRETS_MAX_RESULTS } from "../src/constants";
@@ -288,38 +290,38 @@ describe('Test secret parsing and handling', () => {
     * Test: injectSecret()
     */
     test('Stores a simple secret', () => {
-        injectSecret(TEST_NAME, undefined, TEST_VALUE, false);
+        injectSecret(TEST_NAME, undefined, TEST_VALUE, {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR});
         expect(core.exportVariable).toHaveBeenCalledTimes(1);
         expect(core.exportVariable).toHaveBeenCalledWith(TEST_ENV_NAME, TEST_VALUE);
     });
 
     test('Stores a simple secret with alias', () => {
-        injectSecret(TEST_NAME, 'ALIAS_1', TEST_VALUE, false);
+        injectSecret(TEST_NAME, 'ALIAS_1', TEST_VALUE, {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR});
         expect(core.exportVariable).toHaveBeenCalledTimes(1);
         expect(core.exportVariable).toHaveBeenCalledWith('ALIAS_1', TEST_VALUE);
     });
 
     test('Stores a JSON secret as string when parseJson is false', () => {
-        injectSecret(TEST_NAME, undefined, SIMPLE_JSON_SECRET, false);
+        injectSecret(TEST_NAME, undefined, SIMPLE_JSON_SECRET, {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR});
         expect(core.exportVariable).toHaveBeenCalledTimes(1);
         expect(core.exportVariable).toHaveBeenCalledWith(TEST_ENV_NAME, SIMPLE_JSON_SECRET);
     });
 
     test('Throws an error if reserved name is used', () => {
         expect(() => {
-            injectSecret(CLEANUP_NAME, undefined, TEST_VALUE, false);
+            injectSecret(CLEANUP_NAME, undefined, TEST_VALUE, {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR});
         }).toThrow();
     });
 
     test('Stores a variable for each JSON key value when parseJson is true', () => {
-        injectSecret(TEST_NAME, undefined, SIMPLE_JSON_SECRET, true);
+        injectSecret(TEST_NAME, undefined, SIMPLE_JSON_SECRET, {parseJsonSecrets: true, overwriteMode: OverwriteMode.ERROR});
         expect(core.exportVariable).toHaveBeenCalledTimes(2);
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_API_KEY', 'testkey');
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_USER', 'testuser');
     });
 
     test('Stores a variable for nested JSON key values when parseJson is true', () => {
-        injectSecret(TEST_NAME, undefined, NESTED_JSON_SECRET, true);
+        injectSecret(TEST_NAME, undefined, NESTED_JSON_SECRET, {parseJsonSecrets: true, overwriteMode: OverwriteMode.ERROR});
         expect(core.setSecret).toHaveBeenCalledTimes(7);
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_HOST', '127.0.0.1');
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_PORT', '3600');
@@ -409,3 +411,21 @@ describe('Test secret parsing and handling', () => {
         expect(isJSONString('{ "a": "yes", "options": { "opt_a": "yes", "opt_b": "no"} }')).toBe(true)
     });
 });
+
+describe('#validateOverwriteMode', () => {
+    test('Defaults to ERROR', () => {
+        expect(validateOverwriteMode('')).toBe(OverwriteMode.ERROR);
+    })
+
+    test('Returns valid values', () => {
+        expect(validateOverwriteMode('error')).toBe(OverwriteMode.ERROR);
+        expect(validateOverwriteMode('silent')).toBe(OverwriteMode.SILENT);
+        expect(validateOverwriteMode('warn')).toBe(OverwriteMode.WARN);
+    })
+
+    test('Throws error when value is invalid', () => {
+        expect(() => {
+            validateOverwriteMode('invalid')
+        }).toThrowError("Invalid overwrite mode 'invalid'.")
+    })
+})

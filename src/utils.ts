@@ -8,6 +8,17 @@ import {
 } from "@aws-sdk/client-secrets-manager";
 import { CLEANUP_NAME, LIST_SECRETS_MAX_RESULTS } from "./constants";
 
+export type Options = {
+    parseJsonSecrets: boolean
+    overwriteMode: OverwriteMode
+}
+
+export enum OverwriteMode {
+    ERROR = 'error',
+    SILENT = 'silent',
+    WARN = 'warn',
+}
+
 export interface SecretValueResponse {
     name: string,
     secretValue: string
@@ -126,11 +137,12 @@ export async function getSecretValue(client: SecretsManagerClient, secretId: str
  * @param secretName: Name of the secret
  * @param secretAlias: Alias of the secret. If undefined, defaults to the `secretName`.
  * @param secretValue: Value to set for secret
- * @param parseJsonSecrets: Indicates whether to deserialize JSON secrets
+ * @param options: {@link Options}
  * @param tempEnvName: If parsing JSON secrets, contains the current name for the env variable
  */
-export function injectSecret(secretName: string, secretAlias: string | undefined, secretValue: string, parseJsonSecrets: boolean, tempEnvName?: string): string[] {
+export function injectSecret(secretName: string, secretAlias: string | undefined, secretValue: string, options: Options, tempEnvName?: string): string[] {
     let secretsToCleanup = [] as string[];
+    const {parseJsonSecrets, overwriteMode} = options;
     if(parseJsonSecrets && isJSONString(secretValue)){
         // Recursively parses json secrets
         const secretMap = JSON.parse(secretValue) as Record<string, any>;
@@ -142,14 +154,26 @@ export function injectSecret(secretName: string, secretAlias: string | undefined
             const prefix = tempEnvName || (secretAlias && transformToValidEnvName(secretAlias)) || (secretAlias === undefined && transformToValidEnvName(secretName));
             const envName = transformToValidEnvName(k);
             const fullEnvName: string = prefix ? `${prefix}_${envName}` : envName;
-            secretsToCleanup = [...secretsToCleanup, ...injectSecret(secretName, secretAlias, keyValue, parseJsonSecrets, fullEnvName)];
+            secretsToCleanup = [...secretsToCleanup, ...injectSecret(secretName, secretAlias, keyValue, options, fullEnvName)];
         }
     } else {
         const envName = tempEnvName ? transformToValidEnvName(tempEnvName) : transformToValidEnvName(secretAlias || secretName);
 
-        // Fail the action if this variable name is already in use, or is our cleanup name
-        if (process.env[envName] || envName === CLEANUP_NAME){
-            throw new Error(`The environment name '${envName}' is already in use. Please use an alias to ensure that each secret has a unique environment name`);
+        // Fail the action if env var is our cleanup name
+        if (envName === CLEANUP_NAME) {
+            throw new Error(`The environment name '${CLEANUP_NAME}' cannot be overwritten.`);
+        }
+
+        // Check for overwriting
+        if (process.env[envName]) {
+            switch(overwriteMode) {
+                case OverwriteMode.ERROR:
+                    throw new Error(`The environment name '${envName}' is already in use. Please use an alias to ensure that each secret has a unique environment name.`);
+                case OverwriteMode.SILENT:
+                    break;
+                case OverwriteMode.WARN:
+                    core.warning(`The environment name '${envName}' is already in use. The value will be overwritten.`);
+            }
         }
 
         // Inject a single secret
@@ -233,4 +257,18 @@ export function extractAliasAndSecretIdFromInput(input: string): [string | undef
 export function cleanVariable(variableName: string){
     core.exportVariable(variableName, '');
     delete process.env[variableName];
+}
+
+export function validateOverwriteMode(overwriteMode: string): OverwriteMode {
+    switch (overwriteMode) {
+        case '':
+        case OverwriteMode.ERROR:
+            return OverwriteMode.ERROR;
+        case OverwriteMode.SILENT:
+            return OverwriteMode.SILENT;
+        case OverwriteMode.WARN:
+            return OverwriteMode.WARN;
+        default:
+            throw new Error(`Invalid overwrite mode '${overwriteMode}'.`);
+    }
 }
