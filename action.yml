@@ -16,6 +16,14 @@ inputs:
     description: '(Optional) Define how to handle overwriting secrets.'
     required: false
     default: 'error'
+  public-numerics:
+    description: 'Treat numeric secrets as standard environment variables (unmasked).'
+    required: false
+    default: 'false'
+  public-env-vars:
+    description: '(Optional) Treat specific secrets as standard environment variables (unmasked).'
+    required: false
+    default: ''
 runs:
   using: 'node16'
   main: 'dist/index.js'

@@ -179,7 +179,7 @@ describe('Test secret value retrieval', () => {
     });
 
     test('Throws an error if a prefix filter returns too many results', async () => {
-        let input = ["too/many/matches/*"];
+        const input = ["too/many/matches/*"];
         const expectedParams = {
             Filters: [
                 {
@@ -212,7 +212,7 @@ describe('Test secret value retrieval', () => {
     });
 
     test('Throws an error if a prefix filter has no results', async () => {
-        let input = ["no/matches/*"];
+        const input = ["no/matches/*"];
         const expectedParams = {
             Filters: [
                 {
@@ -235,7 +235,7 @@ describe('Test secret value retrieval', () => {
     });
 
     test('Throws an error if a prefix filter with an alias returns more than 1 result', async () => {
-        let input = ["SECRET_ALIAS,test/*"];
+        const input = ["SECRET_ALIAS,test/*"];
         const expectedParams = {
             Filters: [
                 {
@@ -290,38 +290,38 @@ describe('Test secret parsing and handling', () => {
     * Test: injectSecret()
     */
     test('Stores a simple secret', () => {
-        injectSecret(TEST_NAME, undefined, TEST_VALUE, {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR});
+        injectSecret(TEST_NAME, undefined, TEST_VALUE, {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false});
         expect(core.exportVariable).toHaveBeenCalledTimes(1);
         expect(core.exportVariable).toHaveBeenCalledWith(TEST_ENV_NAME, TEST_VALUE);
     });
 
     test('Stores a simple secret with alias', () => {
-        injectSecret(TEST_NAME, 'ALIAS_1', TEST_VALUE, {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR});
+        injectSecret(TEST_NAME, 'ALIAS_1', TEST_VALUE, {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false});
         expect(core.exportVariable).toHaveBeenCalledTimes(1);
         expect(core.exportVariable).toHaveBeenCalledWith('ALIAS_1', TEST_VALUE);
     });
 
     test('Stores a JSON secret as string when parseJson is false', () => {
-        injectSecret(TEST_NAME, undefined, SIMPLE_JSON_SECRET, {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR});
+        injectSecret(TEST_NAME, undefined, SIMPLE_JSON_SECRET, {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false});
         expect(core.exportVariable).toHaveBeenCalledTimes(1);
         expect(core.exportVariable).toHaveBeenCalledWith(TEST_ENV_NAME, SIMPLE_JSON_SECRET);
     });
 
     test('Throws an error if reserved name is used', () => {
         expect(() => {
-            injectSecret(CLEANUP_NAME, undefined, TEST_VALUE, {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR});
+            injectSecret(CLEANUP_NAME, undefined, TEST_VALUE, {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false});
         }).toThrow();
     });
 
     test('Stores a variable for each JSON key value when parseJson is true', () => {
-        injectSecret(TEST_NAME, undefined, SIMPLE_JSON_SECRET, {parseJsonSecrets: true, overwriteMode: OverwriteMode.ERROR});
+        injectSecret(TEST_NAME, undefined, SIMPLE_JSON_SECRET, {parseJsonSecrets: true, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false});
         expect(core.exportVariable).toHaveBeenCalledTimes(2);
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_API_KEY', 'testkey');
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_USER', 'testuser');
     });
 
     test('Stores a variable for nested JSON key values when parseJson is true', () => {
-        injectSecret(TEST_NAME, undefined, NESTED_JSON_SECRET, {parseJsonSecrets: true, overwriteMode: OverwriteMode.ERROR});
+        injectSecret(TEST_NAME, undefined, NESTED_JSON_SECRET, {parseJsonSecrets: true, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false});
         expect(core.setSecret).toHaveBeenCalledTimes(7);
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_HOST', '127.0.0.1');
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_PORT', '3600');
