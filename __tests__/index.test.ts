@@ -318,7 +318,7 @@ describe('Test main action', () => {
                     case 'public-numerics':
                         return false;
                     default:
-                        fail()
+                        return false;
                 }
             });
             jest.spyOn(core, 'getInput').mockReturnValueOnce('');
@@ -341,7 +341,7 @@ describe('Test main action', () => {
                     case 'public-numerics':
                         return true;
                     default:
-                        fail()
+                        return false;
                 }
             });
             jest.spyOn(core, 'getInput').mockReturnValueOnce('');
@@ -365,7 +365,7 @@ describe('Test main action', () => {
                     case 'public-numerics':
                         return true;
                     default:
-                        fail()
+                        return false;
                 }
             });
             jest.spyOn(core, 'getInput').mockReturnValueOnce('');
@@ -412,7 +412,67 @@ describe('Test main action', () => {
                     case 'public-env-vars':
                         return ['TEST_ONE_USER', 'TEST_TWO_USER'];
                     default:
-                        fail()
+                        return [];
+                }
+            });
+            jest.spyOn(core, 'getBooleanInput').mockReturnValueOnce(true);
+            jest.spyOn(core, 'getInput').mockReturnValueOnce('');
+
+            await run();
+            expect(core.setFailed).not.toHaveBeenCalled();
+            expect(core.exportVariable).toHaveBeenCalledTimes(7);
+
+            expect(core.exportVariable).toHaveBeenCalledWith('TEST_ONE_USER', 'admin');
+            expect(core.exportVariable).toHaveBeenCalledWith('TEST_ONE_PASSWORD', 'adminpw');
+            expect(core.exportVariable).toHaveBeenCalledWith('TEST_TWO_USER', 'integ');
+            expect(core.exportVariable).toHaveBeenCalledWith('TEST_TWO_PASSWORD', 'integpw');
+
+            expect(core.setSecret).not.toHaveBeenCalledWith('admin');
+            expect(core.setSecret).toHaveBeenCalledWith('adminpw');
+            expect(core.setSecret).not.toHaveBeenCalledWith('integ');
+            expect(core.setSecret).toHaveBeenCalledWith('integpw');
+        })
+    })
+
+    describe('public-values', () => {
+        test('does not call setSecret for provided env var values', async () => {
+            // Mock all Secrets Manager calls
+            smMockClient
+                .on(GetSecretValueCommand, { SecretId: TEST_NAME_1 })
+                .resolves({ Name: TEST_NAME_1, SecretString: SECRET_1 })
+                .on(GetSecretValueCommand, { SecretId: TEST_NAME_2 })
+                .resolves({ Name: TEST_NAME_2, SecretString: SECRET_2 })
+                .on(GetSecretValueCommand, { SecretId: TEST_NAME_3 })
+                .resolves({ Name: TEST_NAME_3, SecretString: SECRET_3 })
+                .on(GetSecretValueCommand, { // Retrieve arn secret
+                    SecretId: TEST_ARN_1,
+                })
+                .resolves({
+                    Name: TEST_NAME_4,
+                    SecretString: SECRET_4
+                })
+                .on(ListSecretsCommand)
+                .resolves({
+                    SecretList: [
+                        {
+                            Name: TEST_NAME_1
+                        },
+                        {
+                            Name: TEST_NAME_2
+                        }
+                    ]
+                });
+
+            jest.spyOn(core, 'getMultilineInput').mockImplementation((option: string) => {
+                switch (option) {
+                    case 'secret-ids':
+                        return [TEST_NAME, TEST_INPUT_3, TEST_ARN_INPUT];
+                    case 'public-env-vars':
+                        return [];
+                    case 'public-values':
+                        return ['admin', 'integ'];
+                    default:
+                        return [];
                 }
             });
             jest.spyOn(core, 'getBooleanInput').mockReturnValueOnce(true);

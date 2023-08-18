@@ -16,7 +16,8 @@ import {
     extractAliasAndSecretIdFromInput,
     transformToValidEnvName,
     validateOverwriteMode,
-    OverwriteMode
+    OverwriteMode,
+    Options
 } from "../src/utils";
 
 import { CLEANUP_NAME, LIST_SECRETS_MAX_RESULTS } from "../src/constants";
@@ -33,16 +34,14 @@ const TEST_NAME_1 = 'test/secret1';
 const VALID_ARN_2 = 'arn:aws:secretsmanager:ap-south-1:123456789000:secret:test2-aBcdef';
 const TEST_NAME_2 = 'test/secret2';
 
-const NOT_MATCHING_ARN_3 = 'arn:aws:secretsmanager:us-east-1:123456789000:secret:alternativeSecret-aBcdef';
-const NOT_MATCHING_TEST = 'alternativeSecret';
-
 const INVALID_ARN = 'aws:secretsmanager:us-east-1:123456789000:secret:test3-aBcdef';
+
+const DEFAULT_OPTIONS : Options = {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false, publicValues: []};
 
 jest.mock('@actions/core');
 
 const smClient = new SecretsManagerClient({}); // Cannot send mock directly because of type enforcement
 const smMockClient = mockClient(smClient);
-
 
 describe('Test secret value retrieval', () => {
     beforeEach(() => {
@@ -290,38 +289,38 @@ describe('Test secret parsing and handling', () => {
     * Test: injectSecret()
     */
     test('Stores a simple secret', () => {
-        injectSecret(TEST_NAME, undefined, TEST_VALUE, {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false});
+        injectSecret(TEST_NAME, undefined, TEST_VALUE, {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false, publicValues: []});
         expect(core.exportVariable).toHaveBeenCalledTimes(1);
         expect(core.exportVariable).toHaveBeenCalledWith(TEST_ENV_NAME, TEST_VALUE);
     });
 
     test('Stores a simple secret with alias', () => {
-        injectSecret(TEST_NAME, 'ALIAS_1', TEST_VALUE, {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false});
+        injectSecret(TEST_NAME, 'ALIAS_1', TEST_VALUE, DEFAULT_OPTIONS);
         expect(core.exportVariable).toHaveBeenCalledTimes(1);
         expect(core.exportVariable).toHaveBeenCalledWith('ALIAS_1', TEST_VALUE);
     });
 
     test('Stores a JSON secret as string when parseJson is false', () => {
-        injectSecret(TEST_NAME, undefined, SIMPLE_JSON_SECRET, {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false});
+        injectSecret(TEST_NAME, undefined, SIMPLE_JSON_SECRET, DEFAULT_OPTIONS);
         expect(core.exportVariable).toHaveBeenCalledTimes(1);
         expect(core.exportVariable).toHaveBeenCalledWith(TEST_ENV_NAME, SIMPLE_JSON_SECRET);
     });
 
     test('Throws an error if reserved name is used', () => {
         expect(() => {
-            injectSecret(CLEANUP_NAME, undefined, TEST_VALUE, {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false});
+            injectSecret(CLEANUP_NAME, undefined, TEST_VALUE, DEFAULT_OPTIONS);
         }).toThrow();
     });
 
     test('Stores a variable for each JSON key value when parseJson is true', () => {
-        injectSecret(TEST_NAME, undefined, SIMPLE_JSON_SECRET, {parseJsonSecrets: true, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false});
+        injectSecret(TEST_NAME, undefined, SIMPLE_JSON_SECRET, {...DEFAULT_OPTIONS, parseJsonSecrets: true});
         expect(core.exportVariable).toHaveBeenCalledTimes(2);
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_API_KEY', 'testkey');
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_USER', 'testuser');
     });
 
     test('Stores a variable for nested JSON key values when parseJson is true', () => {
-        injectSecret(TEST_NAME, undefined, NESTED_JSON_SECRET, {parseJsonSecrets: true, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false});
+        injectSecret(TEST_NAME, undefined, NESTED_JSON_SECRET, {...DEFAULT_OPTIONS, parseJsonSecrets: true});
         expect(core.setSecret).toHaveBeenCalledTimes(7);
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_HOST', '127.0.0.1');
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_PORT', '3600');

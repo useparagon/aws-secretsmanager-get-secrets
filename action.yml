@@ -16,12 +16,16 @@ inputs:
     description: '(Optional) Define how to handle overwriting secrets.'
     required: false
     default: 'error'
-  public-numerics:
-    description: 'Treat numeric secrets as standard environment variables (unmasked).'
-    required: false
-    default: 'false'
   public-env-vars:
     description: '(Optional) Treat specific secrets as standard environment variables (unmasked).'
+    required: false
+    default: ''
+  public-numerics:
+    description: '(Optional) Treat numeric secrets as standard environment variables (unmasked).'
+    required: false
+    default: 'false'
+  public-values:
+    description: '(Optional) Treat specific secret values as standard environment variables values (unmasked).'
     required: false
     default: ''
 runs:

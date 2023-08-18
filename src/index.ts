@@ -18,8 +18,9 @@ export async function run(): Promise<void> {
         const secretConfigInputs: string[] = [...new Set(core.getMultilineInput('secret-ids'))];
         const overwriteMode = validateOverwriteMode(core.getInput('overwrite-mode'));
         const parseJsonSecrets = core.getBooleanInput('parse-json-secrets');
-        const publicNumerics = core.getBooleanInput('public-numerics');
         const publicEnvVars = [...new Set(core.getMultilineInput('public-env-vars'))];
+        const publicNumerics = core.getBooleanInput('public-numerics');
+        const publicValues = [...new Set(core.getMultilineInput('public-values'))];
 
         // Get final list of secrets to request
         core.info('Building secrets list...');
@@ -43,10 +44,11 @@ export async function run(): Promise<void> {
                 const secretValueResponse: SecretValueResponse = await getSecretValue(client, secretId);
                 const secretName = isArn ? secretValueResponse.name : secretId;
                 const injectedSecrets = injectSecret(secretName, secretAlias, secretValueResponse.secretValue, {
-                    parseJsonSecrets,
                     overwriteMode,
-                    publicNumerics,
+                    parseJsonSecrets,
                     publicEnvVars,
+                    publicNumerics,
+                    publicValues
                 });
                 secretsToCleanup = [...secretsToCleanup, ...injectedSecrets];
             } catch (err) {

@@ -9,10 +9,11 @@ import {
 import { CLEANUP_NAME, LIST_SECRETS_MAX_RESULTS } from "./constants";
 
 export type Options = {
-    parseJsonSecrets: boolean
     overwriteMode: OverwriteMode
-    publicNumerics: boolean
+    parseJsonSecrets: boolean
     publicEnvVars: string[]
+    publicNumerics: boolean
+    publicValues: string[]
 }
 
 export enum OverwriteMode {
@@ -180,8 +181,9 @@ export function injectSecret(secretName: string, secretAlias: string | undefined
 
         // Inject a single secret
         const isNumericValue = !isNaN(Number(secretValue));
-        const publicEnvVar = options.publicEnvVars.includes(envName);
-        const skipMasking: boolean = (options.publicNumerics && isNumericValue) || publicEnvVar;
+        const isPublicEnvVar = options.publicEnvVars.includes(envName);
+        const isPublicValue = options.publicValues.includes(secretValue);
+        const skipMasking: boolean = (options.publicNumerics && isNumericValue) || isPublicEnvVar || isPublicValue;
         if (!skipMasking) {
             core.setSecret(secretValue);
         }

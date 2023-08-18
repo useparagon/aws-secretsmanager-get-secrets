@@ -68,17 +68,21 @@ To use the action, add a step to your workflow that uses the following syntax.
 
   Note that if the JSON uses case-sensitive keys such as "name" and "Name", the action will have duplicate name conflicts. In this case, set `parse-json-secrets` to `false` and parse the JSON secret value separately.
 
+- `public-env-vars`
+
+  (Optional) Treat specific secrets as standard environment variables (unmasked).
+
+  The value of this option should be a list of environment variable names as ultimately resolved.
+
 - `public-numerics`
 
   (Optional - default `false`) Treat numeric secrets as standard environment variables (unmasked).
 
   Set `public-numerics` to `true` to prevent numeric values from being masked.
 
-- `public-env-vars`
+- `public-values`
 
-  (Optional) Treat specific secrets as standard environment variables (unmasked).
-
-  The value of this option should be a list of environment variable names as ultimately resolved. Not to confused with secret ids.
+  (Optional) Treat specific values as standard environment variables (unmasked).
 
 ### Examples
 ​
