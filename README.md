@@ -62,11 +62,27 @@ To use the action, add a step to your workflow that uses the following syntax.
 
 - `parse-json-secrets`
 
-  (Optional - default false) By default, the action sets the environment variable value to the entire JSON string in the secret value.
+  (Optional - default `false`) By default, the action sets the environment variable value to the entire JSON string in the secret value.
 
   Set `parse-json-secrets` to `true` to create environment variables for each key/value pair in the JSON.
 
   Note that if the JSON uses case-sensitive keys such as "name" and "Name", the action will have duplicate name conflicts. In this case, set `parse-json-secrets` to `false` and parse the JSON secret value separately.
+
+- `public-env-vars`
+
+  (Optional) Treat specific secrets as standard environment variables (unmasked).
+
+  The value of this option should be a list of environment variable names as ultimately resolved.
+
+- `public-numerics`
+
+  (Optional - default `false`) Treat numeric secrets as standard environment variables (unmasked).
+
+  Set `public-numerics` to `true` to prevent numeric values from being masked.
+
+- `public-values`
+
+  (Optional) Treat specific values as standard environment variables (unmasked).
 
 ### Examples
 ​

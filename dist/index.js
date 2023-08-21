@@ -19153,6 +19153,9 @@ function run() {
             const secretConfigInputs = [...new Set(core.getMultilineInput('secret-ids'))];
             const overwriteMode = (0, utils_1.validateOverwriteMode)(core.getInput('overwrite-mode'));
             const parseJsonSecrets = core.getBooleanInput('parse-json-secrets');
+            const publicEnvVars = [...new Set(core.getMultilineInput('public-env-vars'))];
+            const publicNumerics = core.getBooleanInput('public-numerics');
+            const publicValues = [...new Set(core.getMultilineInput('public-values'))];
             // Get final list of secrets to request
             core.info('Building secrets list...');
             const secretIds = yield (0, utils_1.buildSecretsList)(client, secretConfigInputs);
@@ -19169,7 +19172,13 @@ function run() {
                 try {
                     const secretValueResponse = yield (0, utils_1.getSecretValue)(client, secretId);
                     const secretName = isArn ? secretValueResponse.name : secretId;
-                    const injectedSecrets = (0, utils_1.injectSecret)(secretName, secretAlias, secretValueResponse.secretValue, { parseJsonSecrets, overwriteMode });
+                    const injectedSecrets = (0, utils_1.injectSecret)(secretName, secretAlias, secretValueResponse.secretValue, {
+                        overwriteMode,
+                        parseJsonSecrets,
+                        publicEnvVars,
+                        publicNumerics,
+                        publicValues
+                    });
                     secretsToCleanup = [...secretsToCleanup, ...injectedSecrets];
                 }
                 catch (err) {
@@ -19388,7 +19397,13 @@ function injectSecret(secretName, secretAlias, secretValue, options, tempEnvName
             }
         }
         // Inject a single secret
-        core.setSecret(secretValue);
+        const isNumericValue = !isNaN(Number(secretValue));
+        const isPublicEnvVar = options.publicEnvVars.includes(envName);
+        const isPublicValue = options.publicValues.includes(secretValue);
+        const skipMasking = (options.publicNumerics && isNumericValue) || isPublicEnvVar || isPublicValue;
+        if (!skipMasking) {
+            core.setSecret(secretValue);
+        }
         // Export variable
         core.debug(`Injecting secret ${secretName} as environment variable '${envName}'.`);
         core.exportVariable(envName, secretValue);

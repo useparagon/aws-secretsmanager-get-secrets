@@ -189,7 +189,13 @@ function injectSecret(secretName, secretAlias, secretValue, options, tempEnvName
             }
         }
         // Inject a single secret
-        core.setSecret(secretValue);
+        const isNumericValue = !isNaN(Number(secretValue));
+        const isPublicEnvVar = options.publicEnvVars.includes(envName);
+        const isPublicValue = options.publicValues.includes(secretValue);
+        const skipMasking = (options.publicNumerics && isNumericValue) || isPublicEnvVar || isPublicValue;
+        if (!skipMasking) {
+            core.setSecret(secretValue);
+        }
         // Export variable
         core.debug(`Injecting secret ${secretName} as environment variable '${envName}'.`);
         core.exportVariable(envName, secretValue);

@@ -35,15 +35,15 @@ const TEST_ARN_INPUT = ENV_NAME_4 + "," + TEST_ARN_1;
 // Mock the inputs for Github action
 jest.mock('@actions/core', () => {
     return {
-        getMultilineInput: jest.fn((name: string, options?: core.InputOptions) =>  [TEST_NAME, TEST_INPUT_3, TEST_ARN_INPUT] ),
+        getMultilineInput: jest.fn((name: string, options?: core.InputOptions) => [TEST_NAME, TEST_INPUT_3, TEST_ARN_INPUT]),
         getBooleanInput: jest.fn((name: string, options?: core.InputOptions) => true),
         getInput: jest.fn((name: string, options?: core.InputOptions) => ''),
         setFailed: jest.fn(),
         info: jest.fn(),
         debug: jest.fn(),
         warning: jest.fn(),
-        exportVariable:  jest.fn((name: string, val: string) => process.env[name] = val),
-        setSecret:  jest.fn(),
+        exportVariable: jest.fn((name: string, val: string) => process.env[name] = val),
+        setSecret: jest.fn(),
     };
 });
 
@@ -53,7 +53,7 @@ describe('Test main action', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         smMockClient.reset();
-        process.env = {...OLD_ENV, ...DEFAULT_TEST_ENV};
+        process.env = { ...OLD_ENV, ...DEFAULT_TEST_ENV };
     });
 
     afterEach(() => {
@@ -63,10 +63,10 @@ describe('Test main action', () => {
     test('Retrieves and sets the requested secrets as environment variables, parsing JSON', async () => {
         // Mock all Secrets Manager calls
         smMockClient
-            .on(GetSecretValueCommand, { SecretId: TEST_NAME_1})
+            .on(GetSecretValueCommand, { SecretId: TEST_NAME_1 })
             .resolves({ Name: TEST_NAME_1, SecretString: SECRET_1 })
-            .on(GetSecretValueCommand, {SecretId: TEST_NAME_2 })
-            .resolves({  Name: TEST_NAME_2, SecretString: SECRET_2 })
+            .on(GetSecretValueCommand, { SecretId: TEST_NAME_2 })
+            .resolves({ Name: TEST_NAME_2, SecretString: SECRET_2 })
             .on(GetSecretValueCommand, { SecretId: TEST_NAME_3 })
             .resolves({ Name: TEST_NAME_3, SecretString: SECRET_3 })
             .on(GetSecretValueCommand, { // Retrieve arn secret
@@ -302,5 +302,195 @@ describe('Test main action', () => {
             expect(core.setFailed).not.toHaveBeenCalled();
             expect(core.warning).not.toHaveBeenCalled();
         });
+    })
+
+    describe('public-numerics', () => {
+        test('false - calls setSecret on numeric values', async () => {
+            smMockClient
+                .on(GetSecretValueCommand, { SecretId: 'numeric_secret' })
+                .resolves({ Name: 'numeric_secret', SecretString: '1234' })
+
+            jest.spyOn(core, 'getMultilineInput').mockReturnValueOnce(['numeric_secret']);
+            jest.spyOn(core, 'getBooleanInput').mockImplementation((option: string) => {
+                switch (option) {
+                    case 'parse-json-secrets':
+                        return true;
+                    case 'public-numerics':
+                        return false;
+                    default:
+                        return false;
+                }
+            });
+            jest.spyOn(core, 'getInput').mockReturnValueOnce('');
+
+            await run();
+            expect(core.setFailed).not.toHaveBeenCalled();
+            expect(core.setSecret).toHaveBeenCalled();
+        })
+
+        test.each(['0', '1', '123'])('true - does not call setSecret on numeric values: %s', async (secretValue: string) => {
+            smMockClient
+                .on(GetSecretValueCommand, { SecretId: 'numeric_secret' })
+                .resolves({ Name: 'numeric_secret', SecretString: secretValue })
+
+            jest.spyOn(core, 'getMultilineInput').mockReturnValueOnce(['numeric_secret']);
+            jest.spyOn(core, 'getBooleanInput').mockImplementation((option: string) => {
+                switch (option) {
+                    case 'parse-json-secrets':
+                        return true;
+                    case 'public-numerics':
+                        return true;
+                    default:
+                        return false;
+                }
+            });
+            jest.spyOn(core, 'getInput').mockReturnValueOnce('');
+
+            await run();
+            expect(core.setFailed).not.toHaveBeenCalled();
+            expect(core.setSecret).not.toHaveBeenCalled();
+        })
+
+
+        test.each(['string', 'false', '123abc', 'abc123', 'a1b2c'])('true - calls setSecret on non-numeric values: %s', async (secretValue: string) => {
+            smMockClient
+                .on(GetSecretValueCommand, { SecretId: 'numeric_secret' })
+                .resolves({ Name: 'numeric_secret', SecretString: secretValue })
+
+            jest.spyOn(core, 'getMultilineInput').mockReturnValueOnce(['numeric_secret']);
+            jest.spyOn(core, 'getBooleanInput').mockImplementation((option: string) => {
+                switch (option) {
+                    case 'parse-json-secrets':
+                        return true;
+                    case 'public-numerics':
+                        return true;
+                    default:
+                        return false;
+                }
+            });
+            jest.spyOn(core, 'getInput').mockReturnValueOnce('');
+
+            await run();
+            expect(core.setFailed).not.toHaveBeenCalled();
+            expect(core.setSecret).toHaveBeenCalledWith(secretValue);
+        })
+    })
+
+    describe('public-env-vars', () => {
+        test('does not call setSecret for provided env vars', async () => {
+            // Mock all Secrets Manager calls
+            smMockClient
+                .on(GetSecretValueCommand, { SecretId: TEST_NAME_1 })
+                .resolves({ Name: TEST_NAME_1, SecretString: SECRET_1 })
+                .on(GetSecretValueCommand, { SecretId: TEST_NAME_2 })
+                .resolves({ Name: TEST_NAME_2, SecretString: SECRET_2 })
+                .on(GetSecretValueCommand, { SecretId: TEST_NAME_3 })
+                .resolves({ Name: TEST_NAME_3, SecretString: SECRET_3 })
+                .on(GetSecretValueCommand, { // Retrieve arn secret
+                    SecretId: TEST_ARN_1,
+                })
+                .resolves({
+                    Name: TEST_NAME_4,
+                    SecretString: SECRET_4
+                })
+                .on(ListSecretsCommand)
+                .resolves({
+                    SecretList: [
+                        {
+                            Name: TEST_NAME_1
+                        },
+                        {
+                            Name: TEST_NAME_2
+                        }
+                    ]
+                });
+
+            jest.spyOn(core, 'getMultilineInput').mockImplementation((option: string) => {
+                switch (option) {
+                    case 'secret-ids':
+                        return [TEST_NAME, TEST_INPUT_3, TEST_ARN_INPUT];
+                    case 'public-env-vars':
+                        return ['TEST_ONE_USER', 'TEST_TWO_USER'];
+                    default:
+                        return [];
+                }
+            });
+            jest.spyOn(core, 'getBooleanInput').mockReturnValueOnce(true);
+            jest.spyOn(core, 'getInput').mockReturnValueOnce('');
+
+            await run();
+            expect(core.setFailed).not.toHaveBeenCalled();
+            expect(core.exportVariable).toHaveBeenCalledTimes(7);
+
+            expect(core.exportVariable).toHaveBeenCalledWith('TEST_ONE_USER', 'admin');
+            expect(core.exportVariable).toHaveBeenCalledWith('TEST_ONE_PASSWORD', 'adminpw');
+            expect(core.exportVariable).toHaveBeenCalledWith('TEST_TWO_USER', 'integ');
+            expect(core.exportVariable).toHaveBeenCalledWith('TEST_TWO_PASSWORD', 'integpw');
+
+            expect(core.setSecret).not.toHaveBeenCalledWith('admin');
+            expect(core.setSecret).toHaveBeenCalledWith('adminpw');
+            expect(core.setSecret).not.toHaveBeenCalledWith('integ');
+            expect(core.setSecret).toHaveBeenCalledWith('integpw');
+        })
+    })
+
+    describe('public-values', () => {
+        test('does not call setSecret for provided env var values', async () => {
+            // Mock all Secrets Manager calls
+            smMockClient
+                .on(GetSecretValueCommand, { SecretId: TEST_NAME_1 })
+                .resolves({ Name: TEST_NAME_1, SecretString: SECRET_1 })
+                .on(GetSecretValueCommand, { SecretId: TEST_NAME_2 })
+                .resolves({ Name: TEST_NAME_2, SecretString: SECRET_2 })
+                .on(GetSecretValueCommand, { SecretId: TEST_NAME_3 })
+                .resolves({ Name: TEST_NAME_3, SecretString: SECRET_3 })
+                .on(GetSecretValueCommand, { // Retrieve arn secret
+                    SecretId: TEST_ARN_1,
+                })
+                .resolves({
+                    Name: TEST_NAME_4,
+                    SecretString: SECRET_4
+                })
+                .on(ListSecretsCommand)
+                .resolves({
+                    SecretList: [
+                        {
+                            Name: TEST_NAME_1
+                        },
+                        {
+                            Name: TEST_NAME_2
+                        }
+                    ]
+                });
+
+            jest.spyOn(core, 'getMultilineInput').mockImplementation((option: string) => {
+                switch (option) {
+                    case 'secret-ids':
+                        return [TEST_NAME, TEST_INPUT_3, TEST_ARN_INPUT];
+                    case 'public-env-vars':
+                        return [];
+                    case 'public-values':
+                        return ['admin', 'integ'];
+                    default:
+                        return [];
+                }
+            });
+            jest.spyOn(core, 'getBooleanInput').mockReturnValueOnce(true);
+            jest.spyOn(core, 'getInput').mockReturnValueOnce('');
+
+            await run();
+            expect(core.setFailed).not.toHaveBeenCalled();
+            expect(core.exportVariable).toHaveBeenCalledTimes(7);
+
+            expect(core.exportVariable).toHaveBeenCalledWith('TEST_ONE_USER', 'admin');
+            expect(core.exportVariable).toHaveBeenCalledWith('TEST_ONE_PASSWORD', 'adminpw');
+            expect(core.exportVariable).toHaveBeenCalledWith('TEST_TWO_USER', 'integ');
+            expect(core.exportVariable).toHaveBeenCalledWith('TEST_TWO_PASSWORD', 'integpw');
+
+            expect(core.setSecret).not.toHaveBeenCalledWith('admin');
+            expect(core.setSecret).toHaveBeenCalledWith('adminpw');
+            expect(core.setSecret).not.toHaveBeenCalledWith('integ');
+            expect(core.setSecret).toHaveBeenCalledWith('integpw');
+        })
     })
 });
