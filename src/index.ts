@@ -6,7 +6,8 @@ import {
     getSecretValue,
     injectSecret,
     extractAliasAndSecretIdFromInput,
-    SecretValueResponse
+    SecretValueResponse,
+    validateOverwriteMode
 } from "./utils";
 import { CLEANUP_NAME } from "./constants";
 
@@ -15,6 +16,7 @@ export async function run(): Promise<void> {
         // Default client region is set by configure-aws-credentials
         const client : SecretsManagerClient = new SecretsManagerClient({region: process.env.AWS_DEFAULT_REGION, customUserAgent: "github-action"});
         const secretConfigInputs: string[] = [...new Set(core.getMultilineInput('secret-ids'))];
+        const overwriteMode = validateOverwriteMode(core.getInput('overwrite-mode'));
         const parseJsonSecrets = core.getBooleanInput('parse-json-secrets');
 
         // Get final list of secrets to request
@@ -38,11 +40,11 @@ export async function run(): Promise<void> {
             try {
                 const secretValueResponse : SecretValueResponse = await getSecretValue(client, secretId);
                 const secretName = isArn ? secretValueResponse.name : secretId;
-                const injectedSecrets = injectSecret(secretName, secretAlias, secretValueResponse.secretValue, parseJsonSecrets);
+                const injectedSecrets = injectSecret(secretName, secretAlias, secretValueResponse.secretValue, {parseJsonSecrets, overwriteMode});
                 secretsToCleanup = [...secretsToCleanup, ...injectedSecrets];
             } catch (err) {
                 // Fail action for any error
-                core.setFailed(`Failed to fetch secret: '${secretId}'. Error: ${err}.`)
+                core.setFailed(`Failed to fetch secret: '${secretId}'. Reason: ${err}`);
             } 
         }
 
