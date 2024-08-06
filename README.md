@@ -86,7 +86,7 @@ To use the action, add a step to your workflow that uses the following syntax.
 
 - `output-file`
 
-  (Optional) Path to file that will be populated with all `KEY=VALUE` pairs.
+  (Optional) Path to file that will be populated with all `KEY=VALUE` pairs. This is in addition to injecting in environment.
 
 ### Examples
 ​

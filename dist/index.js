@@ -19142,6 +19142,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
 const core = __importStar(__nccwpck_require__(2186));
+const fs = __importStar(__nccwpck_require__(7147));
 const client_secrets_manager_1 = __nccwpck_require__(9600);
 const utils_1 = __nccwpck_require__(1314);
 const constants_1 = __nccwpck_require__(9042);
@@ -19156,12 +19157,17 @@ function run() {
             const publicEnvVars = [...new Set(core.getMultilineInput('public-env-vars'))];
             const publicNumerics = core.getBooleanInput('public-numerics');
             const publicValues = [...new Set(core.getMultilineInput('public-values'))];
+            const outputFile = core.getInput('output-file');
             // Get final list of secrets to request
             core.info('Building secrets list...');
             const secretIds = yield (0, utils_1.buildSecretsList)(client, secretConfigInputs);
             // Keep track of secret names that will need to be cleaned from the environment
             let secretsToCleanup = [];
             core.info('Your secret names may be transformed in order to be valid environment variables (see README). Enable Debug logging in order to view the new environment names.');
+            // Clear existing file
+            if (outputFile && fs.existsSync(outputFile)) {
+                fs.truncateSync(outputFile, 0);
+            }
             // Get and inject secret values
             for (let secretId of secretIds) {
                 //  Optionally let user set an alias, i.e. `ENV_NAME,secret_name`
@@ -19177,7 +19183,8 @@ function run() {
                         parseJsonSecrets,
                         publicEnvVars,
                         publicNumerics,
-                        publicValues
+                        publicValues,
+                        outputFile
                     });
                     secretsToCleanup = [...secretsToCleanup, ...injectedSecrets];
                 }
@@ -19242,6 +19249,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.validateOverwriteMode = exports.cleanVariable = exports.extractAliasAndSecretIdFromInput = exports.isSecretArn = exports.transformToValidEnvName = exports.isJSONString = exports.injectSecret = exports.getSecretValue = exports.getSecretsWithPrefix = exports.buildSecretsList = exports.OverwriteMode = void 0;
 const core = __importStar(__nccwpck_require__(2186));
+const fs = __importStar(__nccwpck_require__(7147));
 const client_secrets_manager_1 = __nccwpck_require__(9600);
 const constants_1 = __nccwpck_require__(9042);
 var OverwriteMode;
@@ -19408,6 +19416,10 @@ function injectSecret(secretName, secretAlias, secretValue, options, tempEnvName
         core.debug(`Injecting secret ${secretName} as environment variable '${envName}'.`);
         core.exportVariable(envName, secretValue);
         secretsToCleanup.push(envName);
+        // Save to file
+        if (options.outputFile) {
+            fs.appendFileSync(options.outputFile, `${envName}=${secretValue}\n`);
+        }
     }
     return secretsToCleanup;
 }

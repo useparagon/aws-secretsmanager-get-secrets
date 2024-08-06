@@ -28,6 +28,10 @@ inputs:
     description: '(Optional) Treat specific secret values as standard environment variables values (unmasked).'
     required: false
     default: ''
+  output-file:
+    description: '(Optional) Path to file that will be populated with all `KEY=VALUE` pairs. This is in addition to injecting in environment.'
+    required: false
+    default: ''
 runs:
   using: 'node16'
   main: 'dist/index.js'
