@@ -36,7 +36,7 @@ const TEST_NAME_2 = 'test/secret2';
 
 const INVALID_ARN = 'aws:secretsmanager:us-east-1:123456789000:secret:test3-aBcdef';
 
-const DEFAULT_OPTIONS : Options = {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false, publicValues: []};
+const DEFAULT_OPTIONS: Options = { parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false, publicValues: [], outputFile: '' };
 
 jest.mock('@actions/core');
 
@@ -88,7 +88,7 @@ describe('Test secret value retrieval', () => {
     });
 
     test('Throws an error if unable to retrieve the secret', async () => {
-        const error = new ResourceNotFoundException({$metadata: {} as any, Message: 'Error'});
+        const error = new ResourceNotFoundException({ $metadata: {} as any, Message: 'Error' });
         smMockClient.on(GetSecretValueCommand).rejects(error);
         await expect(getSecretValue(smClient, TEST_NAME)).rejects.toThrow(error);
     });
@@ -289,7 +289,7 @@ describe('Test secret parsing and handling', () => {
     * Test: injectSecret()
     */
     test('Stores a simple secret', () => {
-        injectSecret(TEST_NAME, undefined, TEST_VALUE, {parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false, publicValues: []});
+        injectSecret(TEST_NAME, undefined, TEST_VALUE, { parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false, publicValues: [], outputFile: '' });
         expect(core.exportVariable).toHaveBeenCalledTimes(1);
         expect(core.exportVariable).toHaveBeenCalledWith(TEST_ENV_NAME, TEST_VALUE);
     });
@@ -313,14 +313,14 @@ describe('Test secret parsing and handling', () => {
     });
 
     test('Stores a variable for each JSON key value when parseJson is true', () => {
-        injectSecret(TEST_NAME, undefined, SIMPLE_JSON_SECRET, {...DEFAULT_OPTIONS, parseJsonSecrets: true});
+        injectSecret(TEST_NAME, undefined, SIMPLE_JSON_SECRET, { ...DEFAULT_OPTIONS, parseJsonSecrets: true });
         expect(core.exportVariable).toHaveBeenCalledTimes(2);
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_API_KEY', 'testkey');
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_USER', 'testuser');
     });
 
     test('Stores a variable for nested JSON key values when parseJson is true', () => {
-        injectSecret(TEST_NAME, undefined, NESTED_JSON_SECRET, {...DEFAULT_OPTIONS, parseJsonSecrets: true});
+        injectSecret(TEST_NAME, undefined, NESTED_JSON_SECRET, { ...DEFAULT_OPTIONS, parseJsonSecrets: true });
         expect(core.setSecret).toHaveBeenCalledTimes(7);
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_HOST', '127.0.0.1');
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_PORT', '3600');
