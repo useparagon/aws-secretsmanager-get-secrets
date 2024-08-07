@@ -197,7 +197,7 @@ export function injectSecret(secretName: string, secretAlias: string | undefined
 
         // Save to file
         if (options.outputFile) {
-            fs.appendFileSync(options.outputFile, `${envName}=${secretValue}\n`);
+            fs.appendFileSync(options.outputFile, `${envName}=${secretValue.replace(/\n/g, '\\n')}\n`);
         }
     }
 

@@ -19397,7 +19397,7 @@ function injectSecret(secretName, secretAlias, secretValue, options, tempEnvName
         secretsToCleanup.push(envName);
         // Save to file
         if (options.outputFile) {
-            fs.appendFileSync(options.outputFile, `${envName}=${secretValue}\n`);
+            fs.appendFileSync(options.outputFile, `${envName}=${secretValue.replace(/\n/g, '\\n')}\n`);
         }
     }
     return secretsToCleanup;
