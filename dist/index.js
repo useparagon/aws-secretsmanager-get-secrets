@@ -19168,6 +19168,7 @@ function run() {
             if (outputFile && fs.existsSync(outputFile)) {
                 fs.truncateSync(outputFile, 0);
             }
+            const aggregate = new Map();
             // Get and inject secret values
             for (let secretId of secretIds) {
                 //  Optionally let user set an alias, i.e. `ENV_NAME,secret_name`
@@ -19184,7 +19185,8 @@ function run() {
                         publicEnvVars,
                         publicNumerics,
                         publicValues,
-                        outputFile
+                        outputFile,
+                        aggregate
                     });
                     secretsToCleanup = [...secretsToCleanup, ...injectedSecrets];
                 }
@@ -19192,6 +19194,13 @@ function run() {
                     // Fail action for any error
                     core.setFailed(`Failed to fetch secret: '${secretId}'. Reason: ${err}`);
                 }
+            }
+            // Write output file
+            if (outputFile && aggregate.size > 0) {
+                const sorted = Array.from(aggregate.entries()).sort(([key1], [key2]) => key1.localeCompare(key2));
+                sorted.forEach(([key, value]) => {
+                    fs.appendFileSync(outputFile, `${key}=${value}\n`);
+                });
             }
             // Export the names of variables to clean up after completion
             core.exportVariable(constants_1.CLEANUP_NAME, JSON.stringify(secretsToCleanup));
@@ -19249,7 +19258,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.validateOverwriteMode = exports.cleanVariable = exports.extractAliasAndSecretIdFromInput = exports.isSecretArn = exports.transformToValidEnvName = exports.isJSONString = exports.injectSecret = exports.getSecretValue = exports.getSecretsWithPrefix = exports.buildSecretsList = exports.OverwriteMode = void 0;
 const core = __importStar(__nccwpck_require__(2186));
-const fs = __importStar(__nccwpck_require__(7147));
 const client_secrets_manager_1 = __nccwpck_require__(9600);
 const constants_1 = __nccwpck_require__(9042);
 var OverwriteMode;
@@ -19416,9 +19424,9 @@ function injectSecret(secretName, secretAlias, secretValue, options, tempEnvName
         core.debug(`Injecting secret ${secretName} as environment variable '${envName}'.`);
         core.exportVariable(envName, secretValue);
         secretsToCleanup.push(envName);
-        // Save to file
+        // Aggregate values for output file later
         if (options.outputFile) {
-            fs.appendFileSync(options.outputFile, `${envName}=${secretValue.replace(/\n/g, '\\n')}\n`);
+            options.aggregate.set(envName, secretValue.replace(/\n/g, '\\n'));
         }
     }
     return secretsToCleanup;

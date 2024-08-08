@@ -34,7 +34,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.validateOverwriteMode = exports.cleanVariable = exports.extractAliasAndSecretIdFromInput = exports.isSecretArn = exports.transformToValidEnvName = exports.isJSONString = exports.injectSecret = exports.getSecretValue = exports.getSecretsWithPrefix = exports.buildSecretsList = exports.OverwriteMode = void 0;
 const core = __importStar(require("@actions/core"));
-const fs = __importStar(require("fs"));
 const client_secrets_manager_1 = require("@aws-sdk/client-secrets-manager");
 const constants_1 = require("./constants");
 var OverwriteMode;
@@ -201,9 +200,9 @@ function injectSecret(secretName, secretAlias, secretValue, options, tempEnvName
         core.debug(`Injecting secret ${secretName} as environment variable '${envName}'.`);
         core.exportVariable(envName, secretValue);
         secretsToCleanup.push(envName);
-        // Save to file
+        // Aggregate values for output file later
         if (options.outputFile) {
-            fs.appendFileSync(options.outputFile, `${envName}=${secretValue.replace(/\n/g, '\\n')}\n`);
+            options.aggregate.set(envName, secretValue.replace(/\n/g, '\\n'));
         }
     }
     return secretsToCleanup;
