@@ -38,6 +38,8 @@ export async function run(): Promise<void> {
             fs.truncateSync(outputFile, 0);
         }
 
+        const aggregate = new Map<string, string>();
+
         // Get and inject secret values
         for (let secretId of secretIds) {
             //  Optionally let user set an alias, i.e. `ENV_NAME,secret_name`
@@ -56,13 +58,22 @@ export async function run(): Promise<void> {
                     publicEnvVars,
                     publicNumerics,
                     publicValues,
-                    outputFile
+                    outputFile,
+                    aggregate
                 });
                 secretsToCleanup = [...secretsToCleanup, ...injectedSecrets];
             } catch (err) {
                 // Fail action for any error
                 core.setFailed(`Failed to fetch secret: '${secretId}'. Reason: ${err}`);
             }
+        }
+
+        // Write output file
+        if (outputFile && aggregate.size > 0) {
+            const sorted = Array.from(aggregate.entries()).sort(([key1], [key2]) => key1.localeCompare(key2));
+            sorted.forEach(([key, value]) => {
+                fs.appendFileSync(outputFile, `${key}=${value}\n`);
+            });
         }
 
         // Export the names of variables to clean up after completion

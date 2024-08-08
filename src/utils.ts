@@ -16,6 +16,7 @@ export type Options = {
     publicNumerics: boolean
     publicValues: string[]
     outputFile: string
+    aggregate: Map<string, string>
 }
 
 export enum OverwriteMode {
@@ -195,9 +196,9 @@ export function injectSecret(secretName: string, secretAlias: string | undefined
         core.exportVariable(envName, secretValue);
         secretsToCleanup.push(envName);
 
-        // Save to file
+        // Aggregate values for output file later
         if (options.outputFile) {
-            fs.appendFileSync(options.outputFile, `${envName}=${secretValue.replace(/\n/g, '\\n')}\n`);
+            options.aggregate.set(envName, secretValue.replace(/\n/g, '\\n'));
         }
     }
 
