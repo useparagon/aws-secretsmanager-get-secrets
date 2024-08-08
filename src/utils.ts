@@ -148,7 +148,8 @@ export async function getSecretValue(client: SecretsManagerClient, secretId: str
 export function injectSecret(secretName: string, secretAlias: string | undefined, secretValue: string, options: Options, tempEnvName?: string): string[] {
     let secretsToCleanup = [] as string[];
     const { parseJsonSecrets, overwriteMode } = options;
-    if (parseJsonSecrets && isJSONString(secretValue)) {
+    // tempEnvName is used to limit the recursion to one level
+    if (parseJsonSecrets && !tempEnvName && isJSONString(secretValue)) {
         // Recursively parses json secrets
         const secretMap = JSON.parse(secretValue) as Record<string, any>;
 

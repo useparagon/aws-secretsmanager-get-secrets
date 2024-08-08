@@ -19353,7 +19353,8 @@ exports.getSecretValue = getSecretValue;
 function injectSecret(secretName, secretAlias, secretValue, options, tempEnvName) {
     let secretsToCleanup = [];
     const { parseJsonSecrets, overwriteMode } = options;
-    if (parseJsonSecrets && isJSONString(secretValue)) {
+    // tempEnvName is used to limit the recursion to one level
+    if (parseJsonSecrets && !tempEnvName && isJSONString(secretValue)) {
         // Recursively parses json secrets
         const secretMap = JSON.parse(secretValue);
         for (const k in secretMap) {
