@@ -68,6 +68,10 @@ To use the action, add a step to your workflow that uses the following syntax.
 
   Note that if the JSON uses case-sensitive keys such as "name" and "Name", the action will have duplicate name conflicts. In this case, set `parse-json-secrets` to `false` and parse the JSON secret value separately.
 
+- `recurse-json-secrets`
+
+  (Optional - default `false`) If true, JSON secrets will be deserialized recursively instead of just at the top level. Since AWS Secrets Manager can store sets of secrets as JSON this will allow parsing those without also then parsing possible JSON strings within those child values.
+
 - `public-env-vars`
 
   (Optional) Treat specific secrets as standard environment variables (unmasked).

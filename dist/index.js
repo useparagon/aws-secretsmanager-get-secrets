@@ -19154,6 +19154,7 @@ function run() {
             const secretConfigInputs = [...new Set(core.getMultilineInput('secret-ids'))];
             const overwriteMode = (0, utils_1.validateOverwriteMode)(core.getInput('overwrite-mode'));
             const parseJsonSecrets = core.getBooleanInput('parse-json-secrets');
+            const recurseJsonSecrets = core.getBooleanInput('recurse-json-secrets');
             const publicEnvVars = [...new Set(core.getMultilineInput('public-env-vars'))];
             const publicNumerics = core.getBooleanInput('public-numerics');
             const publicValues = [...new Set(core.getMultilineInput('public-values'))];
@@ -19179,9 +19180,10 @@ function run() {
                 try {
                     const secretValueResponse = yield (0, utils_1.getSecretValue)(client, secretId);
                     const secretName = isArn ? secretValueResponse.name : secretId;
-                    const injectedSecrets = (0, utils_1.injectSecret)(secretName, secretAlias, secretValueResponse.secretValue, {
+                    const injectedSecrets = (0, utils_1.injectSecret)(secretName, secretAlias, secretValueResponse.secretValue, true, {
                         overwriteMode,
                         parseJsonSecrets,
+                        recurseJsonSecrets,
                         publicEnvVars,
                         publicNumerics,
                         publicValues,
@@ -19380,11 +19382,10 @@ exports.getSecretValue = getSecretValue;
  * @param options: {@link Options}
  * @param tempEnvName: If parsing JSON secrets, contains the current name for the env variable
  */
-function injectSecret(secretName, secretAlias, secretValue, options, tempEnvName) {
+function injectSecret(secretName, secretAlias, secretValue, topLevel, options, tempEnvName) {
     let secretsToCleanup = [];
-    const { parseJsonSecrets, overwriteMode } = options;
-    // tempEnvName is used to limit the recursion to one level
-    if (parseJsonSecrets && !tempEnvName && isJSONString(secretValue)) {
+    const { parseJsonSecrets, recurseJsonSecrets, overwriteMode } = options;
+    if (parseJsonSecrets && isJSONString(secretValue) && (recurseJsonSecrets || topLevel)) {
         // Recursively parses json secrets
         const secretMap = JSON.parse(secretValue);
         for (const k in secretMap) {
@@ -19393,7 +19394,7 @@ function injectSecret(secretName, secretAlias, secretValue, options, tempEnvName
             const prefix = tempEnvName || (secretAlias && transformToValidEnvName(secretAlias)) || (secretAlias === undefined && transformToValidEnvName(secretName));
             const envName = transformToValidEnvName(k);
             const fullEnvName = prefix ? `${prefix}_${envName}` : envName;
-            secretsToCleanup = [...secretsToCleanup, ...injectSecret(secretName, secretAlias, keyValue, options, fullEnvName)];
+            secretsToCleanup = [...secretsToCleanup, ...injectSecret(secretName, secretAlias, keyValue, false, options, fullEnvName)];
         }
     }
     else {

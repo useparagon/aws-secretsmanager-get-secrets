@@ -26,7 +26,7 @@ const TEST_NAME = 'test/secret';
 const TEST_ENV_NAME = 'TEST_SECRET';
 const TEST_VALUE = 'test!secret!value!';
 const SIMPLE_JSON_SECRET = '{"api_key": "testkey", "user": "testuser"}';
-const NESTED_JSON_SECRET = '{"host":"127.0.0.1", "port": "3600", "config":{"db_user":"testuser","db_password":"testpw","options":{"a":"YES","b":"NO", "c": 100 }}}';
+const NESTED_JSON_SECRET = '{"host":"127.0.0.1", "port": "3600", "config":{"db_user":"testuser","db_password":"testpw","options":{"a":"YES","b":"NO","c":100}}}';
 
 const VALID_ARN_1 = 'arn:aws:secretsmanager:us-east-1:123456789000:secret:test1-aBcdef';
 const TEST_NAME_1 = 'test/secret1';
@@ -36,7 +36,7 @@ const TEST_NAME_2 = 'test/secret2';
 
 const INVALID_ARN = 'aws:secretsmanager:us-east-1:123456789000:secret:test3-aBcdef';
 
-const DEFAULT_OPTIONS: Options = { parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false, publicValues: [], outputFile: '' };
+const DEFAULT_OPTIONS: Options = { parseJsonSecrets: false, recurseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false, publicValues: [], outputFile: '', aggregate: new Map<string, string>() };
 
 jest.mock('@actions/core');
 
@@ -289,38 +289,38 @@ describe('Test secret parsing and handling', () => {
     * Test: injectSecret()
     */
     test('Stores a simple secret', () => {
-        injectSecret(TEST_NAME, undefined, TEST_VALUE, { parseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false, publicValues: [], outputFile: '' });
+        injectSecret(TEST_NAME, undefined, TEST_VALUE, true, { parseJsonSecrets: false, recurseJsonSecrets: false, overwriteMode: OverwriteMode.ERROR, publicEnvVars: [], publicNumerics: false, publicValues: [], outputFile: '', aggregate: new Map<string, string>() });
         expect(core.exportVariable).toHaveBeenCalledTimes(1);
         expect(core.exportVariable).toHaveBeenCalledWith(TEST_ENV_NAME, TEST_VALUE);
     });
 
     test('Stores a simple secret with alias', () => {
-        injectSecret(TEST_NAME, 'ALIAS_1', TEST_VALUE, DEFAULT_OPTIONS);
+        injectSecret(TEST_NAME, 'ALIAS_1', TEST_VALUE, true, DEFAULT_OPTIONS);
         expect(core.exportVariable).toHaveBeenCalledTimes(1);
         expect(core.exportVariable).toHaveBeenCalledWith('ALIAS_1', TEST_VALUE);
     });
 
     test('Stores a JSON secret as string when parseJson is false', () => {
-        injectSecret(TEST_NAME, undefined, SIMPLE_JSON_SECRET, DEFAULT_OPTIONS);
+        injectSecret(TEST_NAME, undefined, SIMPLE_JSON_SECRET, true, DEFAULT_OPTIONS);
         expect(core.exportVariable).toHaveBeenCalledTimes(1);
         expect(core.exportVariable).toHaveBeenCalledWith(TEST_ENV_NAME, SIMPLE_JSON_SECRET);
     });
 
     test('Throws an error if reserved name is used', () => {
         expect(() => {
-            injectSecret(CLEANUP_NAME, undefined, TEST_VALUE, DEFAULT_OPTIONS);
+            injectSecret(CLEANUP_NAME, undefined, TEST_VALUE, true, DEFAULT_OPTIONS);
         }).toThrow();
     });
 
     test('Stores a variable for each JSON key value when parseJson is true', () => {
-        injectSecret(TEST_NAME, undefined, SIMPLE_JSON_SECRET, { ...DEFAULT_OPTIONS, parseJsonSecrets: true });
+        injectSecret(TEST_NAME, undefined, SIMPLE_JSON_SECRET, true, { ...DEFAULT_OPTIONS, parseJsonSecrets: true });
         expect(core.exportVariable).toHaveBeenCalledTimes(2);
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_API_KEY', 'testkey');
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_USER', 'testuser');
     });
 
-    test('Stores a variable for nested JSON key values when parseJson is true', () => {
-        injectSecret(TEST_NAME, undefined, NESTED_JSON_SECRET, { ...DEFAULT_OPTIONS, parseJsonSecrets: true });
+    test('Stores a variable for nested JSON key values when parseJson and recurseJson are true', () => {
+        injectSecret(TEST_NAME, undefined, NESTED_JSON_SECRET, true, { ...DEFAULT_OPTIONS, parseJsonSecrets: true, recurseJsonSecrets: true });
         expect(core.setSecret).toHaveBeenCalledTimes(7);
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_HOST', '127.0.0.1');
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_PORT', '3600');
@@ -329,6 +329,14 @@ describe('Test secret parsing and handling', () => {
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_CONFIG_OPTIONS_A', 'YES');
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_CONFIG_OPTIONS_B', 'NO');
         expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_CONFIG_OPTIONS_C', '100');
+    });
+
+    test('Stores a variable for top level JSON key values when parseJson is true and recurseJson is false', () => {
+        injectSecret(TEST_NAME, undefined, NESTED_JSON_SECRET, true, { ...DEFAULT_OPTIONS, parseJsonSecrets: true });
+        expect(core.setSecret).toHaveBeenCalledTimes(3);
+        expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_HOST', '127.0.0.1');
+        expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_PORT', '3600');
+        expect(core.exportVariable).toHaveBeenCalledWith('TEST_SECRET_CONFIG', '{"db_user":"testuser","db_password":"testpw","options":{"a":"YES","b":"NO","c":100}}');
     });
 
     /* 

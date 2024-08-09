@@ -11,6 +11,7 @@ import { CLEANUP_NAME, LIST_SECRETS_MAX_RESULTS } from "./constants";
 export type Options = {
     overwriteMode: OverwriteMode
     parseJsonSecrets: boolean
+    recurseJsonSecrets: boolean
     publicEnvVars: string[]
     publicNumerics: boolean
     publicValues: string[]
@@ -145,11 +146,10 @@ export async function getSecretValue(client: SecretsManagerClient, secretId: str
  * @param options: {@link Options}
  * @param tempEnvName: If parsing JSON secrets, contains the current name for the env variable
  */
-export function injectSecret(secretName: string, secretAlias: string | undefined, secretValue: string, options: Options, tempEnvName?: string): string[] {
+export function injectSecret(secretName: string, secretAlias: string | undefined, secretValue: string, topLevel: boolean, options: Options, tempEnvName?: string): string[] {
     let secretsToCleanup = [] as string[];
-    const { parseJsonSecrets, overwriteMode } = options;
-    // tempEnvName is used to limit the recursion to one level
-    if (parseJsonSecrets && !tempEnvName && isJSONString(secretValue)) {
+    const { parseJsonSecrets, recurseJsonSecrets, overwriteMode } = options;
+    if (parseJsonSecrets && isJSONString(secretValue) && (recurseJsonSecrets || topLevel)) {
         // Recursively parses json secrets
         const secretMap = JSON.parse(secretValue) as Record<string, any>;
 
@@ -160,7 +160,7 @@ export function injectSecret(secretName: string, secretAlias: string | undefined
             const prefix = tempEnvName || (secretAlias && transformToValidEnvName(secretAlias)) || (secretAlias === undefined && transformToValidEnvName(secretName));
             const envName = transformToValidEnvName(k);
             const fullEnvName: string = prefix ? `${prefix}_${envName}` : envName;
-            secretsToCleanup = [...secretsToCleanup, ...injectSecret(secretName, secretAlias, keyValue, options, fullEnvName)];
+            secretsToCleanup = [...secretsToCleanup, ...injectSecret(secretName, secretAlias, keyValue, false, options, fullEnvName)];
         }
     } else {
         const envName = tempEnvName ? transformToValidEnvName(tempEnvName) : transformToValidEnvName(secretAlias || secretName);
