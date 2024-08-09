@@ -12,6 +12,10 @@ inputs:
     description: '(Optional) If true, JSON secrets will be deserialized, creating a secret environment variable for each key-value pair.'
     required: false
     default: 'false'
+  recurse-json-secrets:
+    description: '(Optional) If true, JSON secrets will be deserialized recursively instead of just at the top level.'
+    required: false
+    default: 'false'
   overwrite-mode:
     description: '(Optional) Define how to handle overwriting secrets.'
     required: false
@@ -26,6 +30,10 @@ inputs:
     default: 'false'
   public-values:
     description: '(Optional) Treat specific secret values as standard environment variables values (unmasked).'
+    required: false
+    default: ''
+  output-file:
+    description: '(Optional) Path to file that will be populated with all `KEY=VALUE` pairs. This is in addition to injecting in environment.'
     required: false
     default: ''
 runs:

@@ -1,4 +1,5 @@
 import * as core from '@actions/core'
+import * as fs from 'fs';
 import { SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
 import {
     buildSecretsList,
@@ -18,9 +19,11 @@ export async function run(): Promise<void> {
         const secretConfigInputs: string[] = [...new Set(core.getMultilineInput('secret-ids'))];
         const overwriteMode = validateOverwriteMode(core.getInput('overwrite-mode'));
         const parseJsonSecrets = core.getBooleanInput('parse-json-secrets');
+        const recurseJsonSecrets = core.getBooleanInput('recurse-json-secrets');
         const publicEnvVars = [...new Set(core.getMultilineInput('public-env-vars'))];
         const publicNumerics = core.getBooleanInput('public-numerics');
         const publicValues = [...new Set(core.getMultilineInput('public-values'))];
+        const outputFile = core.getInput('output-file');
 
         // Get final list of secrets to request
         core.info('Building secrets list...');
@@ -30,6 +33,13 @@ export async function run(): Promise<void> {
         let secretsToCleanup = [] as string[];
 
         core.info('Your secret names may be transformed in order to be valid environment variables (see README). Enable Debug logging in order to view the new environment names.');
+
+        // Clear existing file
+        if (outputFile && fs.existsSync(outputFile)) {
+            fs.truncateSync(outputFile, 0);
+        }
+
+        const aggregate = new Map<string, string>();
 
         // Get and inject secret values
         for (let secretId of secretIds) {
@@ -43,18 +53,29 @@ export async function run(): Promise<void> {
             try {
                 const secretValueResponse: SecretValueResponse = await getSecretValue(client, secretId);
                 const secretName = isArn ? secretValueResponse.name : secretId;
-                const injectedSecrets = injectSecret(secretName, secretAlias, secretValueResponse.secretValue, {
+                const injectedSecrets = injectSecret(secretName, secretAlias, secretValueResponse.secretValue, true, {
                     overwriteMode,
                     parseJsonSecrets,
+                    recurseJsonSecrets,
                     publicEnvVars,
                     publicNumerics,
-                    publicValues
+                    publicValues,
+                    outputFile,
+                    aggregate
                 });
                 secretsToCleanup = [...secretsToCleanup, ...injectedSecrets];
             } catch (err) {
                 // Fail action for any error
                 core.setFailed(`Failed to fetch secret: '${secretId}'. Reason: ${err}`);
             }
+        }
+
+        // Write output file
+        if (outputFile && aggregate.size > 0) {
+            const sorted = Array.from(aggregate.entries()).sort(([key1], [key2]) => key1.localeCompare(key2));
+            sorted.forEach(([key, value]) => {
+                fs.appendFileSync(outputFile, `${key}=${value}\n`);
+            });
         }
 
         // Export the names of variables to clean up after completion
@@ -65,7 +86,5 @@ export async function run(): Promise<void> {
         if (error instanceof Error) core.setFailed(error.message)
     }
 }
-
-
 
 run();

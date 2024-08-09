@@ -11,9 +11,12 @@ import { CLEANUP_NAME, LIST_SECRETS_MAX_RESULTS } from "./constants";
 export type Options = {
     overwriteMode: OverwriteMode
     parseJsonSecrets: boolean
+    recurseJsonSecrets: boolean
     publicEnvVars: string[]
     publicNumerics: boolean
     publicValues: string[]
+    outputFile: string
+    aggregate: Map<string, string>
 }
 
 export enum OverwriteMode {
@@ -82,11 +85,11 @@ export async function getSecretsWithPrefix(client: SecretsManagerClient, prefix:
 
     const response: ListSecretsResponse = await client.send(new ListSecretsCommand(params));
 
-    if (response.SecretList){
+    if (response.SecretList) {
         const secretsList = response.SecretList;
-        if (secretsList.length === 0){
+        if (secretsList.length === 0) {
             throw new Error(`No matching secrets were returned for prefix "${prefix}".`);
-        } else if (hasAlias && secretsList.length > 1){
+        } else if (hasAlias && secretsList.length > 1) {
             // If an alias was requested, we cannot match more than one result
             throw new Error(`A unique alias was requested for prefix "${prefix}", but the search result for this prefix returned multiple results.`);
         } else if (response.NextToken) {
@@ -115,7 +118,7 @@ export async function getSecretsWithPrefix(client: SecretsManagerClient, prefix:
 export async function getSecretValue(client: SecretsManagerClient, secretId: string): Promise<SecretValueResponse> {
     let secretValue = '';
 
-    const data = await client.send(new GetSecretValueCommand({SecretId: secretId}));
+    const data = await client.send(new GetSecretValueCommand({ SecretId: secretId }));
 
     if (data.SecretString) {
         secretValue = data.SecretString as string;
@@ -124,7 +127,7 @@ export async function getSecretValue(client: SecretsManagerClient, secretId: str
         secretValue = Buffer.from(data.SecretBinary).toString('ascii');
     }
 
-    if (!(data.Name)){
+    if (!(data.Name)) {
         throw new Error('Invalid name for secret');
     }
 
@@ -143,10 +146,10 @@ export async function getSecretValue(client: SecretsManagerClient, secretId: str
  * @param options: {@link Options}
  * @param tempEnvName: If parsing JSON secrets, contains the current name for the env variable
  */
-export function injectSecret(secretName: string, secretAlias: string | undefined, secretValue: string, options: Options, tempEnvName?: string): string[] {
+export function injectSecret(secretName: string, secretAlias: string | undefined, secretValue: string, topLevel: boolean, options: Options, tempEnvName?: string): string[] {
     let secretsToCleanup = [] as string[];
-    const {parseJsonSecrets, overwriteMode} = options;
-    if(parseJsonSecrets && isJSONString(secretValue)){
+    const { parseJsonSecrets, recurseJsonSecrets, overwriteMode } = options;
+    if (parseJsonSecrets && isJSONString(secretValue) && (recurseJsonSecrets || topLevel)) {
         // Recursively parses json secrets
         const secretMap = JSON.parse(secretValue) as Record<string, any>;
 
@@ -157,7 +160,7 @@ export function injectSecret(secretName: string, secretAlias: string | undefined
             const prefix = tempEnvName || (secretAlias && transformToValidEnvName(secretAlias)) || (secretAlias === undefined && transformToValidEnvName(secretName));
             const envName = transformToValidEnvName(k);
             const fullEnvName: string = prefix ? `${prefix}_${envName}` : envName;
-            secretsToCleanup = [...secretsToCleanup, ...injectSecret(secretName, secretAlias, keyValue, options, fullEnvName)];
+            secretsToCleanup = [...secretsToCleanup, ...injectSecret(secretName, secretAlias, keyValue, false, options, fullEnvName)];
         }
     } else {
         const envName = tempEnvName ? transformToValidEnvName(tempEnvName) : transformToValidEnvName(secretAlias || secretName);
@@ -169,7 +172,7 @@ export function injectSecret(secretName: string, secretAlias: string | undefined
 
         // Check for overwriting
         if (process.env[envName]) {
-            switch(overwriteMode) {
+            switch (overwriteMode) {
                 case OverwriteMode.ERROR:
                     throw new Error(`The environment name '${envName}' is already in use. Please use an alias to ensure that each secret has a unique environment name.`);
                 case OverwriteMode.SILENT:
@@ -192,6 +195,11 @@ export function injectSecret(secretName: string, secretAlias: string | undefined
         core.debug(`Injecting secret ${secretName} as environment variable '${envName}'.`);
         core.exportVariable(envName, secretValue);
         secretsToCleanup.push(envName);
+
+        // Aggregate values for output file later
+        if (options.outputFile) {
+            options.aggregate.set(envName, secretValue.replace(/\n/g, '\\n'));
+        }
     }
 
     return secretsToCleanup;
@@ -217,7 +225,7 @@ export function isJSONString(secretValue: string): boolean {
  */
 export function transformToValidEnvName(secretName: string): string {
     // Leading digits are invalid
-    if (secretName.match(/^[0-9]/)){
+    if (secretName.match(/^[0-9]/)) {
         secretName = '_'.concat(secretName);
     }
 
@@ -242,13 +250,13 @@ export function isSecretArn(secretId: string): boolean {
  */
 export function extractAliasAndSecretIdFromInput(input: string): [string | undefined, string] {
     const parsedInput = input.split(',');
-    if (parsedInput.length > 1){
+    if (parsedInput.length > 1) {
         const alias = parsedInput[0].trim();
         const secretId = parsedInput[1].trim();
 
         // Validate that the alias is valid environment name
         const validateEnvName = transformToValidEnvName(alias);
-        if (alias !== validateEnvName){
+        if (alias !== validateEnvName) {
             throw new Error(`The alias '${alias}' is not a valid environment name. Please verify that it has uppercase letters, numbers, and underscore only.`);
         }
 
@@ -257,13 +265,13 @@ export function extractAliasAndSecretIdFromInput(input: string): [string | undef
     }
 
     // No alias
-    return [ undefined, input.trim() ];
+    return [undefined, input.trim()];
 }
 
 /*
  * Cleans up an environment variable
  */
-export function cleanVariable(variableName: string){
+export function cleanVariable(variableName: string) {
     core.exportVariable(variableName, '');
     delete process.env[variableName];
 }

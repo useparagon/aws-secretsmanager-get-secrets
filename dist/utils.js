@@ -156,10 +156,10 @@ exports.getSecretValue = getSecretValue;
  * @param options: {@link Options}
  * @param tempEnvName: If parsing JSON secrets, contains the current name for the env variable
  */
-function injectSecret(secretName, secretAlias, secretValue, options, tempEnvName) {
+function injectSecret(secretName, secretAlias, secretValue, topLevel, options, tempEnvName) {
     let secretsToCleanup = [];
-    const { parseJsonSecrets, overwriteMode } = options;
-    if (parseJsonSecrets && isJSONString(secretValue)) {
+    const { parseJsonSecrets, recurseJsonSecrets, overwriteMode } = options;
+    if (parseJsonSecrets && isJSONString(secretValue) && (recurseJsonSecrets || topLevel)) {
         // Recursively parses json secrets
         const secretMap = JSON.parse(secretValue);
         for (const k in secretMap) {
@@ -168,7 +168,7 @@ function injectSecret(secretName, secretAlias, secretValue, options, tempEnvName
             const prefix = tempEnvName || (secretAlias && transformToValidEnvName(secretAlias)) || (secretAlias === undefined && transformToValidEnvName(secretName));
             const envName = transformToValidEnvName(k);
             const fullEnvName = prefix ? `${prefix}_${envName}` : envName;
-            secretsToCleanup = [...secretsToCleanup, ...injectSecret(secretName, secretAlias, keyValue, options, fullEnvName)];
+            secretsToCleanup = [...secretsToCleanup, ...injectSecret(secretName, secretAlias, keyValue, false, options, fullEnvName)];
         }
     }
     else {
@@ -200,6 +200,10 @@ function injectSecret(secretName, secretAlias, secretValue, options, tempEnvName
         core.debug(`Injecting secret ${secretName} as environment variable '${envName}'.`);
         core.exportVariable(envName, secretValue);
         secretsToCleanup.push(envName);
+        // Aggregate values for output file later
+        if (options.outputFile) {
+            options.aggregate.set(envName, secretValue.replace(/\n/g, '\\n'));
+        }
     }
     return secretsToCleanup;
 }

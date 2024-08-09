@@ -1,4 +1,5 @@
 import * as core from '@actions/core'
+import * as fs from 'fs';
 import { mockClient } from "aws-sdk-client-mock";
 import {
     GetSecretValueCommand, ListSecretsCommand,
@@ -32,18 +33,31 @@ const ENV_NAME_4 = 'ARN_ALIAS';
 const SECRET_4 = "secretString2";
 const TEST_ARN_INPUT = ENV_NAME_4 + "," + TEST_ARN_1;
 
+const TEST_FILE = '.env-output-file';
+
 // Mock the inputs for Github action
 jest.mock('@actions/core', () => {
     return {
         getMultilineInput: jest.fn((name: string, options?: core.InputOptions) => [TEST_NAME, TEST_INPUT_3, TEST_ARN_INPUT]),
         getBooleanInput: jest.fn((name: string, options?: core.InputOptions) => true),
-        getInput: jest.fn((name: string, options?: core.InputOptions) => ''),
+        getInput: jest.fn((name: string, options?: core.InputOptions) => name === 'output-file' ? TEST_FILE : ''),
         setFailed: jest.fn(),
         info: jest.fn(),
         debug: jest.fn(),
         warning: jest.fn(),
         exportVariable: jest.fn((name: string, val: string) => process.env[name] = val),
         setSecret: jest.fn(),
+    };
+});
+
+// Mock the fs commands
+jest.mock('fs', () => {
+    const actualFs = jest.requireActual('fs');
+    return {
+        ...actualFs,
+        appendFileSync: jest.fn((path, data) => { }),
+        existsSync: jest.fn((path) => true),
+        truncateSync: jest.fn((path, len) => { }),
     };
 });
 
@@ -491,6 +505,30 @@ describe('Test main action', () => {
             expect(core.setSecret).toHaveBeenCalledWith('adminpw');
             expect(core.setSecret).not.toHaveBeenCalledWith('integ');
             expect(core.setSecret).toHaveBeenCalledWith('integpw');
+        })
+    })
+
+    describe('output-file', () => {
+        test('Appending secrets to file', async () => {
+            // Mock all Secrets Manager calls
+            smMockClient
+                .on(GetSecretValueCommand, { SecretId: TEST_NAME_1 })
+                .resolves({ Name: TEST_NAME_1, SecretString: SECRET_1 })
+                .on(ListSecretsCommand)
+                .resolves({
+                    SecretList: [
+                        {
+                            Name: TEST_NAME_1
+                        }
+                    ]
+                });
+
+            await run();
+
+            expect(fs.existsSync).toHaveBeenCalledWith(TEST_FILE);
+            expect(fs.truncateSync).toHaveBeenCalled();
+            expect(fs.appendFileSync).toHaveBeenCalledWith(TEST_FILE, 'TEST_ONE_USER=admin\n');
+            expect(fs.appendFileSync).toHaveBeenCalledWith(TEST_FILE, 'TEST_ONE_PASSWORD=adminpw\n');
         })
     })
 });
